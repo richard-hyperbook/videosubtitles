@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "573927619253",
+    "project_id": "scafflife-support1-v2xz8c",
+    "storage_bucket": "scafflife-support1-v2xz8c.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:573927619253:android:1201e259f7c55520885cfc",
+        "android_client_info": {
+          "package_name": "com.mycompany.scafflifesupport1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByaw_QgJBKz2jYLvvP2EYuLSbVNRBJB84"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
