@@ -208,7 +208,7 @@ class _HomePageWidgetState extends State<HomePageWidget> {
                             isMultiSelect: false,
                           ),
                           Text(
-                            'Version: 8',
+                            'Version: 9',
                             style: FlutterFlowTheme.of(context).bodyMedium,
                           ),
                         ],
