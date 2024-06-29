@@ -20,11 +20,10 @@ class RunStepsPageWidget extends StatefulWidget {
     this.testParentRefParam,
   });
 
-  final DocumentReference? testRunParam;
-  final List<bool>? passFailsParam;
+  final RunsRecord? testRunParam; //////
+  final List<String>? passFailsParam;
   final List<String>? notesParam;
   final DocumentReference? testParentRefParam;
-
 
   @override
   State<RunStepsPageWidget> createState() => _RunStepsPageWidgetState();
@@ -37,7 +36,7 @@ class _RunStepsPageWidgetState extends State<RunStepsPageWidget> {
   void initState() {
     super.initState();
     // On page load action.
-    WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
+    // WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {}));
   }
 
   @override
@@ -45,10 +44,13 @@ class _RunStepsPageWidgetState extends State<RunStepsPageWidget> {
     super.dispose();
   }
 
+  List<RunStepsItemWidget> runStepItemWidgetList = [];
+
   @override
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
-
+    runStepItemWidgetList.clear();
+    print('(L161)');
     return Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
@@ -87,15 +89,14 @@ class _RunStepsPageWidgetState extends State<RunStepsPageWidget> {
                     ),
                     FFButtonWidget(
                       onPressed: () async {
-                        await TestsRecord.collection
-                            .doc()
-                            .set(createTestsRecordData(
-                              testName: '?',
-                              dateCreated: getCurrentTimestamp,
-                              dateModified: getCurrentTimestamp,
-                            ));
+                        int noOfSteps = runStepItemWidgetList.length;
+                        print('(L160A)${noOfSteps}');
+                        for (int i = 0; i < noOfSteps; i++){
+                          String passFail = runStepItemWidgetList[i].passFail!;
+                          print('(L160B)${i}%${passFail}');
+                        }
                       },
-                      text: 'Next',
+                      text: 'Save Run',
                       options: FFButtonOptions(
                         height: 40.0,
                         padding: const EdgeInsetsDirectional.fromSTEB(
@@ -140,14 +141,16 @@ class _RunStepsPageWidgetState extends State<RunStepsPageWidget> {
                         ),
                       );
                     }
-                    List<TestStepsRecord> listViewTestStepsRecordList = snapshot.data!;
+                    List<TestStepsRecord> listViewTestStepsRecordList =
+                        snapshot.data!;
                     // if (listViewTestsRecordList.length > 0) {
                     //   parentTestsListGlobal.clear();
                     //   for (int i = 0; i < listViewTestsRecordList.length; i++) {
                     //     parentTestsListGlobal.add(listViewTestsRecordList[i]);
                     //   }
                     // }
-                    print('(L90)${parentTestsListGlobal}');
+                    print('(L95)${parentTestsListGlobal}');
+                    runStepItemWidgetList.clear();
                     return ListView.builder(
                       padding: EdgeInsets.zero,
                       shrinkWrap: true,
@@ -156,24 +159,23 @@ class _RunStepsPageWidgetState extends State<RunStepsPageWidget> {
                       itemBuilder: (context, listViewIndex) {
                         final listViewTestStepsRecord =
                             listViewTestStepsRecordList[listViewIndex];
-                        return RunStepsItemWidget(
-                          // key: Key(
-                          //     'Keyu0g_${listViewIndex}_of_${listViewTestStepsRecordList.length}'),
-                          index: listViewIndex.toDouble(),
-
-                        descriptionParam: listViewTestStepsRecord.description,
-                        passCriteraiParam: listViewTestStepsRecord.passCriteria,
-                        screenshotParam: listViewTestStepsRecord.screenshot,
-                        testStepItemRef: listViewTestStepsRecord.reference,
-
-
-
-                        index: listViewIndex,
-                          testNameParam: listViewTestStepsRecord.testName,
-                          testsRefParam: listViewTestStepsRecord.reference,
-                          dateCreatedParam: listViewTestStepsRecord.dateCreated!,
-                          dateModifiedParam: listViewTestStepsRecord.dateModified!,
-                        );
+                        runStepItemWidgetList.insert(
+                            listViewIndex,
+                            RunStepsItemWidget(
+                              // key: Key(
+                              //     'Keyu0g_${listViewIndex}_of_${listViewTestStepsRecordList.length}'),
+                              index: listViewIndex.toDouble(),
+                              descriptionParam:
+                                  listViewTestStepsRecord.description,
+                              passCriteraiParam:
+                                  listViewTestStepsRecord.passCriteria,
+                              screenshotParam:
+                                  listViewTestStepsRecord.screenshot,
+                              testStepItemRef:
+                                  listViewTestStepsRecord.reference,
+                              testRunRef: widget.testRunParam,
+                            ));
+                        return runStepItemWidgetList[listViewIndex];
                       },
                     );
                   },

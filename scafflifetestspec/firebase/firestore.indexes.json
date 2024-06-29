@@ -1,0 +1,18 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "TestSteps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "parentTest",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "index",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "266467834452",
+    "project_id": "scafflifetestspec-tav5ez",
+    "storage_bucket": "scafflifetestspec-tav5ez.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:266467834452:android:5032deb533bbb6d0950bc1",
+        "android_client_info": {
+          "package_name": "com.scafflife.scafflifetestspec"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPb5-9xAL58pDdFP7O_br_4JAnmVf4MTo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
