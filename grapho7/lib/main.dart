@@ -18,6 +18,8 @@ appwrite.Storage storage = appwrite.Storage(client!);
 
 enum Attribute { FILENO, NAME, DATE, ALTDATE, CORRESPONDANT }
 
+enum LoadType { asset, database }
+
 List<Item> items = [];
 List<Widget> widgets = [];
 List<RowObject> rows = [];
@@ -193,11 +195,12 @@ const kGridHeight = 10;
 class _MyHomePageState extends State<MyHomePage> {
   // static const kGridSize = 100;
 
-@override
-void initState(){
-  super.initState();
-  numberInputTextController = TextEditingController();
-}
+  @override
+  void initState() {
+    super.initState();
+    numberInputTextController = TextEditingController();
+  }
+
   RowObject populateRow(List<String> rowItems) {
     Item fileNo = Item(
       attribute: Attribute.FILENO,
@@ -241,17 +244,63 @@ void initState(){
     Widget correspondantWidget = correspondant.insertTextField();
 
     // widgets.add(ElevatedButton(onPressed: () {}, child: Text('Save')));
-    RowObject  ri = RowObject(count, [fileNo, name, date, altDate, correspondant],
-    [fileNoWidget, nameWidget, dateWidget, altDateWidget, correspondantWidget]);
+    RowObject ri = RowObject(
+      count,
+      [fileNo, name, date, altDate, correspondant],
+      [
+        fileNoWidget,
+        nameWidget,
+        dateWidget,
+        altDateWidget,
+        correspondantWidget,
+      ],
+    );
     rows.add(ri);
     count++;
     return ri;
   }
 
-  Future<void> loadFile() async {
+  Future<String?> getStorageFileDownload({models.File? file}) async {
+    Uint8List bytes = await storage.getFileDownload(
+      bucketId: graphoStorageRef.path!,
+      fileId: file!.$id,
+    );
+    String s = utf8.decode(bytes);
+    //>print('(XY30)${file!.$id}++++${bytes.length}****${s}');
+    return s;
+  }
+
+  Future<void> loadFile(LoadType loadType) async {
     print('(LF1)');
-    String sql = await rootBundle.loadString('assets/sql.txt');
-    // print('(LF2)' + sql);
+    String sql = '';
+    models.File? chosenFile;
+    String? chosenFilename;
+    if (loadType == LoadType.asset) {
+      sql = await rootBundle.loadString('assets/sql.txt');
+    } else {
+      models.FileList listOfFiles = await listStorageFiles(
+        bucketId: graphoStorageRef.path,
+      );
+
+      for (int i = 0; i < listOfFiles.files.length; i++) {
+        String fileName = listOfFiles.files[i].name;
+        List<String> splitFilename = fileName.split('_');
+        if (splitFilename[1] == numberInputTextController!.text) {
+          chosenFile = listOfFiles.files[i];
+          chosenFilename = listOfFiles.files[i].name;
+          break;
+        }
+      }
+      //      final String expandedFilename = 'grapho_' + numberInputTextController!.text;
+      if (chosenFile != null) {
+        Uint8List bytes = await storage.getFileDownload(
+          bucketId: graphoStorageRef.path!,
+          fileId: chosenFile.$id,
+        );
+        sql = utf8.decode(bytes);
+      }
+    }
+    print('(LF2)' + sql);
     // Map<String, List<List<String>>> decodedSQL = json.decode(sql);
     Map<String, dynamic> decodedSQL = json.decode(sql);
     print('(LF3)${decodedSQL.keys}....${(decodedSQL.values.first[1][2])}');
@@ -271,8 +320,6 @@ void initState(){
     }
   }
 
-
-
   Future<void> saveFile() async {
     String s = '{"sqlArray":[';
     for (int r = 0; r < rows.length; r++) {
@@ -283,19 +330,25 @@ void initState(){
           s = s + ',';
         }
       }
-      s = s + '],\n';
+      if(r == ( rows.length - 1)){
+        print('(LF110)${r}');
+        s = s + ']';
+      } else {
+        print('(LF111)${r}');
+        s = s + '],\n';
+      }
     }
     s = s + ']}';
     print('(LF15)${s.length}');
-    final String expandedFilename = 'grapho_a';
+    final String expandedFilename = 'grapho_' + numberInputTextController!.text;
     models.File result = await storage.createFile(
       bucketId: graphoStorageRef.path!,
       fileId: expandedFilename,
       file: appwrite.InputFile.fromBytes(
-          bytes: utf8.encode(s), filename: expandedFilename),
+        bytes: utf8.encode(s),
+        filename: expandedFilename,
+      ),
     );
-
-
   }
 
   int rowSortComparison(RowObject a, RowObject b) {
@@ -306,39 +359,81 @@ void initState(){
 
   int maxVersion = 0;
 
-  void updateNumber(int increment){
+  void updateNumber(int increment) {
     maxVersion = maxVersion + increment;
   }
+
   TextEditingController? numberInputTextController;
 
-  Widget insertVersionSpinner(){
-    return
-
-     Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-    Text('Version number:'),
-    SizedBox(
-    width: 100,
-    child: NumberInputPrefabbed.directionalButtons(
-    initialValue: maxVersion + 1,
-    onChanged: (value) {
-    updateNumber(value.toInt());
-    },
-    onIncrement: (value) {
-    updateNumber(value.toInt());
-    },
-    onDecrement: (value) {
-    updateNumber(value.toInt());
-    },
-    isInt: true,
-    scaleHeight: 0.8,
-    controller: numberInputTextController!,
-    ),
-    ),
-    ],
+  Widget insertVersionSpinner() {
+    print('(LF91)${maxVersion}');
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text('Version number:'),
+        SizedBox(
+          width: 100,
+          child: NumberInputPrefabbed.directionalButtons(
+            key: UniqueKey(),
+            initialValue: maxVersion,
+            onChanged: (value) {
+              updateNumber(value.toInt());
+            },
+            onIncrement: (value) {
+              updateNumber(value.toInt());
+            },
+            onDecrement: (value) {
+              updateNumber(value.toInt());
+            },
+            isInt: true,
+            scaleHeight: 0.8,
+            controller: numberInputTextController!,
+          ),
+        ),
+      ],
     );
+  }
+
+  Future<models.FileList> listStorageFiles({String? bucketId}) async {
+    //>print('(XY6)${bucketId}');
+    models.FileList fileList = models.FileList(total: 0, files: []);
+    try {
+      fileList = await storage.listFiles(
+        bucketId: bucketId!,
+        queries: [appwrite.Query.limit(1000)],
+      );
+      //>print('(XY7)${fileList.files.length}');
+      if (fileList.files.length < 1) {
+        for (models.File file in fileList.files) {
+          String filename = file.name;
+          //>print('(XY8)${filename}');
+        }
+      }
+    } catch (e) {
+      //>print('(XY9)${e.toString()}');
+    }
+    return fileList;
+  }
+
+  Future<void> setNewVersion() async {
+    models.FileList? backupFileList = await listStorageFiles(
+      bucketId: graphoStorageRef.path,
+    );
+    for (models.File file in backupFileList!.files) {
+      String filename = file.name;
+      print('(LF101)${filename}&&&&');
+      List<String> splitFileName = filename.split('_');
+      int? greatestVersionNumber = int.tryParse(splitFileName[1]);
+      maxVersion = 0;
+      if (greatestVersionNumber != null) {
+        if (maxVersion < greatestVersionNumber!)
+          maxVersion = greatestVersionNumber;
+      }
+    }
+    maxVersion++;
+    print('(LF102)${maxVersion}');
+    setState(() {});
   }
 
   @override
@@ -358,45 +453,95 @@ void initState(){
               children: [
                 ElevatedButton(
                   onPressed: () async {
-                    await loadFile();
+                    await loadFile(LoadType.asset);
                     print('(LF11)${rows.length}');
                     setState(() {});
                   },
                   child: Text('Load asset'),
                   style: ButtonStyle(
-                    backgroundColor: WidgetStatePropertyAll<Color>(Colors.amber),
-                    foregroundColor: WidgetStatePropertyAll<Color>(Colors.black),
+                    backgroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.amber,
+                    ),
+                    foregroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.black,
+                    ),
                   ),
                 ),
-                SizedBox(width:50),
-                insertVersionSpinner(),
-                SizedBox(width:50),
+                SizedBox(width: 50),
                 ElevatedButton(
                   onPressed: () async {
-                    print('(LF21)${rows[1].rowItems[1].textController.text}...${rows[2].rowItems[2].textController.text}');
+                    await loadFile(LoadType.database);
+                    print('(LF11)${rows.length}');
+                    setState(() {});
+                  },
+                  child: Text('Load database'),
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.amber,
+                    ),
+                    foregroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.black,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 50),
+                ElevatedButton(
+                  onPressed: () async {
+                    await setNewVersion();
+                    print('(LF81)${maxVersion}');
+                    setState(() {});
+                  },
+                  child: Text('Set new version'),
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.amber,
+                    ),
+                    foregroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.black,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 50),
+                insertVersionSpinner(),
+                SizedBox(width: 50),
+                ElevatedButton(
+                  onPressed: () async {
+                    print(
+                      '(LF21)${rows[1].rowItems[1].textController.text}...${rows[2].rowItems[2].textController.text}',
+                    );
                     rows.sort(rowSortComparison);
-                    print('(LF22)${rows[1].rowItems[1].textController.text}...${rows[2].rowItems[2].textController.text}');
+                    print(
+                      '(LF22)${rows[1].rowItems[1].textController.text}...${rows[2].rowItems[2].textController.text}',
+                    );
                     setState(() {});
                   },
                   child: Text('Sort'),
                   style: ButtonStyle(
-                    backgroundColor: WidgetStatePropertyAll<Color>(Colors.amber),
-                    foregroundColor: WidgetStatePropertyAll<Color>(Colors.black),
+                    backgroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.amber,
+                    ),
+                    foregroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.black,
+                    ),
                   ),
                 ),
-                SizedBox(width:50),
+                SizedBox(width: 50),
                 ElevatedButton(
-              onPressed: () async {
-                await saveFile();
-                print('(LF11)${widgets.length}');
-                setState(() {});
-              },
-              child: Text('Save'),
-              style: ButtonStyle(
-                backgroundColor: WidgetStatePropertyAll<Color>(Colors.amber),
-                foregroundColor: WidgetStatePropertyAll<Color>(Colors.black),
-              ),
-            ),
+                  onPressed: () async {
+                    await saveFile();
+                    print('(LF11)${widgets.length}');
+                    setState(() {});
+                  },
+                  child: Text('Save'),
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.amber,
+                    ),
+                    foregroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.black,
+                    ),
+                  ),
+                ),
               ],
             ),
             Expanded(
@@ -417,7 +562,7 @@ void initState(){
                     int modulus = index % 5;
                     int rowIndex = index ~/ 5;
                     print('(LF16)${index}');
-                    return  rows[rowIndex].rowWidgets[modulus];
+                    return rows[rowIndex].rowWidgets[modulus];
                     // ),
                     /* )*/
                   },
