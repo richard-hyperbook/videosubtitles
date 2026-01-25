@@ -4,7 +4,7 @@ description: "A new Flutter project."
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.1+2
+version: 1.0.1+4
 
 environment:
   sdk: ^3.10.0-290.1.beta
@@ -25,6 +25,10 @@ dependencies:
   mime: ^2.0.0
   dio: ^5.9.0
   number_inc_dec: ^0.8.0
+  auto_size_text: ^3.0.0
+  font_awesome_flutter: ^10.12.0
+  intl: ^0.20.2
+  awesome_dialog: ^3.3.0
 
 dev_dependencies:
   flutter_test:

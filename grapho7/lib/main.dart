@@ -7,6 +7,11 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart';
 import 'package:number_inc_dec/number_inc_dec.dart';
+import "button.dart";
+import 'package:intl/intl.dart';
+import 'package:awesome_dialog/awesome_dialog.dart';
+
+const int versionNumber = 4;
 
 appwrite.Client? client;
 appwrite.Databases? databases;
@@ -16,7 +21,7 @@ appwrite.Account? account;
 
 appwrite.Storage storage = appwrite.Storage(client!);
 
-enum Attribute { FILENO, NAME, DATE, ALTDATE, CORRESPONDANT }
+enum Attribute { FILENO, NAME, DATE, ALTDATE, CORRESPONDANT, SEARCH }
 
 enum LoadType { asset, database }
 
@@ -24,6 +29,9 @@ List<Item> items = [];
 List<Widget> widgets = [];
 List<RowObject> rows = [];
 int count = 0;
+int matches = 0;
+
+Item? searchItem;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,9 +52,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo 2',
+      title: 'Grapho 7',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.deepPurple)),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: MyHomePage(title: 'Grapho7 (${versionNumber.toString()})'),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -63,7 +72,7 @@ class Item {
     items.add(this);
   }
 
-  Widget insertTextField() {
+  Widget insertTextField(int rowIndex) {
     widget = /*GridTile(*/
         /*   header: Padding(
         padding: const EdgeInsets.all(15.0),
@@ -71,7 +80,7 @@ class Item {
       ),*/
         /*child:*/ Container(
           padding: const EdgeInsets.all(3),
-          color: Colors.amber,
+          color: (rowIndex == 0)? Colors.lime : Colors.amber,
           width: width,
           height: 20,
           child: TextFormField(
@@ -147,38 +156,11 @@ class Item {
 }
 
 class RowObject {
-  List<Item> rowItems = [];
-  List<Widget> rowWidgets = [];
-  int index = 0;
-  RowObject(this.index, this.rowItems, this.rowWidgets);
+  List<Item>? rowItems = [];
+  List<Widget>? rowWidgets = [];
+  int? index = 0;
+  RowObject({this.index, this.rowItems, this.rowWidgets});
 }
-/*class Row {
-  List<String> row = [];
-  Row(this.row);
-  factory Row.fromJson(List<dynamic> data) {
-    final row2 = data as List<String>;
-    return Row(row2);
-  }
-}
-
-class Array {
-  List<Row> array = [];
-  Array(this.array);
-  factory Array.fromJson(List<dynamic> data) {
-    final array2 = data as List<Row>;
-    return Array(array2);
-  }
-}
-
-class Grapho {
-  Map<String, List<List<String>>>? grapho = {};
-  Grapho({this.grapho});
-  factory Grapho.fromJson(Map<String, dynamic> data) {
-    print('(LF7)${data}');
-    final grapho2 = data as Map<String, List<List<String>>>?;
-    return Grapho(grapho: grapho2);
-  }
-}*/
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
@@ -199,9 +181,16 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     numberInputTextController = TextEditingController();
+    searchItem = Item(
+      attribute: Attribute.SEARCH,
+      label: 'Search',
+      content: '',
+      width: 100,
+    );
+    _gridViewController = ScrollController(initialScrollOffset: 0.0,);
   }
 
-  RowObject populateRow(List<String> rowItems) {
+  RowObject populateRow(List<String> rowItems, int rowIndex) {
     Item fileNo = Item(
       attribute: Attribute.FILENO,
       label: 'File number',
@@ -209,7 +198,7 @@ class _MyHomePageState extends State<MyHomePage> {
       width: 50,
     );
     //widgets.add(fileNo.insertTextField());
-    Widget fileNoWidget = fileNo.insertTextField();
+    Widget fileNoWidget = fileNo.insertTextField(rowIndex);
     Item name = Item(
       attribute: Attribute.FILENO,
       label: 'Description',
@@ -217,7 +206,7 @@ class _MyHomePageState extends State<MyHomePage> {
       width: 250,
     );
     // widgets.add(name.insertTextField());
-    Widget nameWidget = name.insertTextField();
+    Widget nameWidget = name.insertTextField(rowIndex);
     Item date = Item(
       attribute: Attribute.FILENO,
       label: 'Date',
@@ -225,7 +214,7 @@ class _MyHomePageState extends State<MyHomePage> {
       width: 70,
     );
     // widgets.add(date.insertTextField());
-    Widget dateWidget = date.insertTextField();
+    Widget dateWidget = date.insertTextField(rowIndex);
     Item altDate = Item(
       attribute: Attribute.FILENO,
       label: 'Alt Date',
@@ -233,7 +222,7 @@ class _MyHomePageState extends State<MyHomePage> {
       width: 70,
     );
     // widgets.add(altDate.insertTextField());
-    Widget altDateWidget = altDate.insertTextField();
+    Widget altDateWidget = altDate.insertTextField(rowIndex);
     Item correspondant = Item(
       attribute: Attribute.FILENO,
       label: 'Correspondant',
@@ -241,13 +230,13 @@ class _MyHomePageState extends State<MyHomePage> {
       width: 250,
     );
     // widgets.add(correspondant.insertTextField());
-    Widget correspondantWidget = correspondant.insertTextField();
+    Widget correspondantWidget = correspondant.insertTextField(rowIndex);
 
     // widgets.add(ElevatedButton(onPressed: () {}, child: Text('Save')));
     RowObject ri = RowObject(
-      count,
-      [fileNo, name, date, altDate, correspondant],
-      [
+      index: count,
+      rowItems: [fileNo, name, date, altDate, correspondant],
+      rowWidgets: [
         fileNoWidget,
         nameWidget,
         dateWidget,
@@ -306,8 +295,10 @@ class _MyHomePageState extends State<MyHomePage> {
     print('(LF3)${decodedSQL.keys}....${(decodedSQL.values.first[1][2])}');
     // print('(LF4)${decodedSQL.keys}....${decodedSQL.values}');
     // print(decodedSQL);
+
     for (List<dynamic> yy in decodedSQL.values) {
       print('(LF8)${yy.length}');
+      int rowIndex = 0;
       for (List<dynamic> xx in yy) {
         print('(LF9)${xx}');
         List<String> row = [];
@@ -315,7 +306,8 @@ class _MyHomePageState extends State<MyHomePage> {
           row.add(xx[i] as String);
           //   print('(LF10)${i as String}');
         }
-        populateRow(row);
+        populateRow(row, rowIndex);
+        rowIndex++;
       }
     }
   }
@@ -325,12 +317,12 @@ class _MyHomePageState extends State<MyHomePage> {
     for (int r = 0; r < rows.length; r++) {
       s = s + '[';
       for (int i = 0; i < 5; i++) {
-        s = s + '"' + rows[r].rowItems[i].textController.text + '"';
+        s = s + '"' + rows[r].rowItems![i].textController.text + '"';
         if (i < 4) {
           s = s + ',';
         }
       }
-      if(r == ( rows.length - 1)){
+      if (r == (rows.length - 1)) {
         print('(LF110)${r}');
         s = s + ']';
       } else {
@@ -352,9 +344,86 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   int rowSortComparison(RowObject a, RowObject b) {
-    String propertyA = a.rowItems[0].textController.text;
-    String propertyB = b.rowItems[0].textController.text;
-    return propertyB.compareTo(propertyA);
+    String searchField = (searchItem!.textController.text).toLowerCase();
+    String fileNoA = a.rowItems![0].textController.text;
+    String fileNoB = b.rowItems![0].textController.text;
+    String nameA = (a.rowItems![1].textController.text).toLowerCase();
+    String nameB = (b.rowItems![1].textController.text).toLowerCase();
+    if (fileNoA[0] == currentSection) {
+      if (nameA.contains(searchField)) {
+        fileNoA = '2#' + fileNoA;
+      } else {
+        fileNoA = '1#' + fileNoA;
+      }
+    } else {
+      fileNoA = '0#' + fileNoA;
+    }
+    if (fileNoB[0] == currentSection) {
+      if (nameB.contains(searchField)) {
+        fileNoB = '2#' + fileNoB;
+      } else {
+        fileNoB = '1#' + fileNoB;
+      }
+    } else {
+      fileNoB = '0#' + fileNoB;
+    }
+    return fileNoB.compareTo(fileNoA);
+    /*
+    if (searchField.length == 0) {
+      if (currentSection != ' ') {
+        return fileNoB.compareTo(fileNoA);
+      } else {
+        if ((fileNoA[0] == currentSection) && (fileNoB[0] == currentSection)) {
+          return fileNoB.compareTo(fileNoA);
+        } else {
+          if (fileNoA[0] == currentSection) {
+            return -1;
+          } else {
+            if (fileNoB[0] == currentSection) {
+              return 1;
+            }
+          }
+        }
+      }
+    } else {
+      if (currentSection != ' ') {
+        if ((nameA.contains(searchField)) && (nameB.contains(searchField))) {
+          return fileNoB.compareTo(fileNoA);
+        } else {
+          if (nameA.contains(searchField)) {
+            return -1;
+          } else {
+            if (nameB.contains(searchField)) {
+              return 1;
+            } else {
+
+            }
+
+
+
+
+          }
+        }
+      } else {
+        if ((fileNoA[0] == currentSection) &&
+            (fileNoB[0] == currentSection) &&
+            (nameA.contains(searchField)) &&
+            (nameB.contains(searchField))) {
+          return fileNoB.compareTo(fileNoA);
+        } else {
+          if ((fileNoA[0] == currentSection) && (nameA.contains(searchField))) {
+            return -1;
+          } else {
+            if ((fileNoB[0] == currentSection) &&
+                (nameA.contains(searchField))) {
+              return 1;
+            }
+          }
+        }
+
+      }
+
+   */
   }
 
   int maxVersion = 0;
@@ -376,6 +445,7 @@ class _MyHomePageState extends State<MyHomePage> {
           width: 100,
           child: NumberInputPrefabbed.directionalButtons(
             key: UniqueKey(),
+            //key: ValueKey(maxVersion),
             initialValue: maxVersion,
             onChanged: (value) {
               updateNumber(value.toInt());
@@ -416,10 +486,11 @@ class _MyHomePageState extends State<MyHomePage> {
     return fileList;
   }
 
-  Future<void> setNewVersion() async {
+  Future<void> setMaxVersion() async {
     models.FileList? backupFileList = await listStorageFiles(
       bucketId: graphoStorageRef.path,
     );
+
     for (models.File file in backupFileList!.files) {
       String filename = file.name;
       print('(LF101)${filename}&&&&');
@@ -431,14 +502,122 @@ class _MyHomePageState extends State<MyHomePage> {
           maxVersion = greatestVersionNumber;
       }
     }
-    maxVersion++;
+    // maxVersion++;
     print('(LF102)${maxVersion}');
+    // setState(() {});
+    // print('(LF103)${maxVersion}');
+  }
+
+  Widget insertSearchTextField() {
+    return Container(
+      width: 150,
+      height: 40,
+      child: searchItem!.insertTextField(0),
+    );
+  }
+
+  void insertInsert() {
+    final f = new DateFormat('yyyy-MM-dd hh:mm');
+    // String searchField = searchItem!.textController.text;
+    String? topString;
+    // String searchPrefix = searchField[0];
+    if (currentSection != ' ') {
+      topString = currentSection! + 'ZZZ';
+    } else {
+      topString = 'ZZZZ';
+    }
+
+    int maxNumber = 0;
+    for (int i = 0; i < rows.length; i++) {
+      String prefix = rows[i].rowItems![0].textController.text[0];
+      if (prefix == currentSection) {
+        String suffix = rows[i].rowItems![0].textController.text.substring(
+          1,
+          4,
+        );
+        int? suffixInt = int.tryParse(suffix);
+        if ((suffixInt ?? 0) > maxNumber) {
+          maxNumber = suffixInt ?? maxNumber;
+        }
+      }
+    }
+    print('(LF900)${maxNumber}');
+    maxNumber++;
+    DateTime today = DateTime.now();
+    String todayStr = DateFormat('dd/MM/yyyy').format(today);
+    String numberString = maxNumber.toString();
+    if (maxNumber < 100) {
+      numberString = '0' + numberString;
+    }
+    if (maxNumber < 10) {
+      numberString = '0' + numberString;
+    }
+    populateRow([currentSection! + numberString, '', todayStr, '', ''], 0);
+    rows.sort(rowSortComparison);
     setState(() {});
   }
 
+  static const List<String> kSectionList = [
+    ' ',
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'G',
+    'H',
+    'Z',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+  ];
+  String? currentSection;
+
+  Widget insertSectionSelection() {
+    return DropdownButton<String>(
+      /*key: ValueKey(
+                    widget),
+                */
+      value: currentSection ?? 'H',
+      hint: const Text('Section'),
+      items: kSectionList.map<DropdownMenuItem<String>>((String item) {
+        return DropdownMenuItem<String>(
+          /*  enabled: (_checkRoleLegal(item: item,
+                        currentRole: listViewConnectedUsersRecord.status!)),
+                  */
+          value: item,
+          child: Text(item),
+        );
+      }).toList(),
+      elevation: 2,
+      onChanged: (String? value) {
+        currentSection = value!;
+        setState(() {});
+      },
+    );
+  }
+
+  void rebuildAllChildren(BuildContext context) {
+    void rebuild(Element el) {
+      el.markNeedsBuild();
+      el.visitChildren(rebuild);
+    }
+
+    (context as Element).visitChildren(rebuild);
+  }
+
+  ScrollController? _gridViewController;
   @override
   Widget build(BuildContext context) {
     print('(LF13)${rows.length}');
+    // rebuildAllChildren(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -448,10 +627,10 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              // mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton(
+                /*ElevatedButton(
                   onPressed: () async {
                     await loadFile(LoadType.asset);
                     print('(LF11)${rows.length}');
@@ -466,8 +645,8 @@ class _MyHomePageState extends State<MyHomePage> {
                       Colors.black,
                     ),
                   ),
-                ),
-                SizedBox(width: 50),
+                ),*/
+                // SizedBox(width: 50),
                 ElevatedButton(
                   onPressed: () async {
                     await loadFile(LoadType.database);
@@ -487,11 +666,11 @@ class _MyHomePageState extends State<MyHomePage> {
                 SizedBox(width: 50),
                 ElevatedButton(
                   onPressed: () async {
-                    await setNewVersion();
+                    await setMaxVersion();
                     print('(LF81)${maxVersion}');
                     setState(() {});
                   },
-                  child: Text('Set new version'),
+                  child: Text('Set max version'),
                   style: ButtonStyle(
                     backgroundColor: WidgetStatePropertyAll<Color>(
                       Colors.amber,
@@ -504,18 +683,110 @@ class _MyHomePageState extends State<MyHomePage> {
                 SizedBox(width: 50),
                 insertVersionSpinner(),
                 SizedBox(width: 50),
+                insertSearchTextField(),
+                SizedBox(width: 50),
+                insertSectionSelection(),
+                SizedBox(width: 50),
+
+                // FFButtonWidget(
+                //   text: 'Sort',
+                //   onPressed: () async {
+                //     rows.sort(rowSortComparison);
+                //   },
+                //   options: FFButtonOptions(
+                //     color: Colors.blue,
+                //     textStyle: TextStyle(color: Colors.white),
+                //   ),
+                // ),
                 ElevatedButton(
                   onPressed: () async {
                     print(
-                      '(LF21)${rows[1].rowItems[1].textController.text}...${rows[2].rowItems[2].textController.text}',
+                      '(LF21)${rows[1].rowItems![1].textController.text}...${rows[2].rowItems![2].textController.text}',
                     );
                     rows.sort(rowSortComparison);
+                    matches = 0;
+                    String searchField = (searchItem!.textController.text)
+                        .toLowerCase();
+                    for (int i = 0; i < rows.length; i++) {
+                      if (currentSection == ' ') {
+                        if (rows[i].rowItems![1].textController.text
+                            .toLowerCase()
+                            .contains(searchField)) {
+                          matches = matches + 1;
+                          print(
+                            '(LF400)${i}....${rows[i].rowItems![1].textController.text}',
+                          );
+                        }
+                      } else {
+                        print(
+                          '(LF402)${rows[i].rowItems![0].textController.text}',
+                        );
+                        if ((rows[i].rowItems![1].textController.text
+                                .toLowerCase()
+                                .contains(searchField)) &&
+                            (rows[i].rowItems![0].textController.text[0] ==
+                                currentSection)) {
+                          matches = matches + 1;
+                          print(
+                            '(LF401)${i}....${rows[i].rowItems![1].textController.text}',
+                          );
+                        }
+                      }
+                    }
                     print(
-                      '(LF22)${rows[1].rowItems[1].textController.text}...${rows[2].rowItems[2].textController.text}',
+                      '(LF22)${rows[1].rowItems![1].textController.text}...${rows[2].rowItems![2].textController.text}',
                     );
                     setState(() {});
                   },
-                  child: Text('Sort'),
+                  child: Text('Sort ' + matches.toString()),
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.amber,
+                    ),
+                    foregroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.black,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 50),
+                ElevatedButton(
+                  onPressed: () async {
+                    insertInsert();
+                  },
+                  child: Text('Insert'),
+                  style: ButtonStyle(
+                    backgroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.amber,
+                    ),
+                    foregroundColor: WidgetStatePropertyAll<Color>(
+                      Colors.black,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 50),
+                ElevatedButton(
+                  onPressed: () async {
+                    print(
+                      '(LF500)${rows.length}....${rows[0].rowItems![0].textController.text}',
+                    );
+                    AwesomeDialog(
+                      width: 250,
+                      context: context,
+                      dialogType: DialogType.question,
+                      animType: AnimType.scale,
+                      title: 'Delete',
+                      desc: 'Delete first entry',
+                      btnCancelOnPress: () {},
+                      btnOkOnPress: () {
+                        rows.removeAt(0);
+                        print(
+                          '(LF500)${rows.length}....${rows[0].rowItems![0].textController.text}',
+                        );
+                        setState(() {});
+                      },
+                    )..show();
+                  },
+                  child: Text('Delete'),
                   style: ButtonStyle(
                     backgroundColor: WidgetStatePropertyAll<Color>(
                       Colors.amber,
@@ -553,7 +824,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     mainAxisSpacing: 8.0, // spacing between rows
                     crossAxisSpacing: 8.0,
                     childAspectRatio: 4.0, // spacing between columns
-                  ),
+                  ),controller: _gridViewController,
 
                   shrinkWrap: true,
                   padding: EdgeInsets.all(8.0), // padding around the grid
@@ -562,7 +833,10 @@ class _MyHomePageState extends State<MyHomePage> {
                     int modulus = index % 5;
                     int rowIndex = index ~/ 5;
                     print('(LF16)${index}');
-                    return rows[rowIndex].rowWidgets[modulus];
+                    if (rows[rowIndex] == null) {
+                      return Container();
+                    }
+                    return rows[rowIndex].rowWidgets![modulus];
                     // ),
                     /* )*/
                   },
@@ -585,9 +859,16 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+        onPressed: () {
+          setState((){
+            _gridViewController!.animateTo(
+              _gridViewController!.position.minScrollExtent,
+              curve: Curves.easeOut,
+              duration: const Duration(milliseconds: 500),
+            );});
+        },
+        tooltip: 'Scroll to top',
+        child: const Icon(Icons.upgrade),
       ),
     );
   }
