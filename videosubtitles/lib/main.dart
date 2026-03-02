@@ -83,9 +83,7 @@ class _SubtitleGeneratorPageState extends State<SubtitleGeneratorPage> {
   final _appwriteFileIdCtrl = TextEditingController(
     text: 'video698e04cf0004b5e7e7df_36.mp4',
   );
-  final _googleApiKeyCtrl = TextEditingController(
-    text: 'AIzaSyCKkjrHVvE_KDFDCLjJxA77obvui4Zfhc8',
-  );
+
 
   bool _isProcessing = false;
   String _statusMessage = 'Idle';
